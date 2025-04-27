@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fuel Cost and Mileage Calculator</title>
+  <style>
+    /* Embedded minimal Tailwind-like utility CSS */
+    :root {
+      --color-primary: #2563eb;
+      --color-primary-dark: #1d4ed8;
+      --color-gray-100: #f3f4f6;
+      --color-gray-300: #d1d5db;
+      --color-gray-700: #374151;
+      --color-gray-900: #111827;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background-color: var(--color-gray-100);
+      color: var(--color-gray-900);
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      max-width: 480px;
+      width: 100%;
+      padding: 2rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      text-align: center;
+      color: var(--color-primary);
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      color: var(--color-gray-700);
+    }
+    input[type="number"],
+    input[type="date"] {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--color-gray-300);
+      border-radius: 0.375rem;
+      font-size: 1rem;
+      color: var(--color-gray-900);
+      transition: border-color 0.2s ease;
+    }
+    input[type="number"]:focus,
+    input[type="date"]:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+    }
+    .input-group {
+      margin-bottom: 1rem;
+    }
+    .currency-input {
+      position: relative;
+    }
+    .currency-input span {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-gray-700);
+      font-weight: 600;
+      pointer-events: none;
+      user-select: none;
+    }
+    .currency-input input {
+      padding-left: 1.75rem;
+    }
+    button {
+      width: 100%;
+      background-color: var(--color-primary);
+      color: white;
+      font-weight: 700;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 0.375rem;
+      font-size: 1.125rem;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    button:hover {
+      background-color: var(--color-primary-dark);
+    }
+    .results {
+      margin-top: 1.5rem;
+      background-color: var(--color-gray-100);
+      padding: 1rem;
+      border-radius: 0.375rem;
+      font-size: 1rem;
+      color: var(--color-gray-900);
+      min-height: 3rem;
+    }
+    .error {
+      color: #dc2626;
+      font-weight: 600;
+      margin-top: 0.5rem;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="container" role="main" aria-label="Fuel cost and mileage calculator">
+    <h1>Fuel Cost &amp; Mileage Calculator</h1>
+    <form id="fuelForm" novalidate>
+      <div class="input-group">
+        <label for="date">Date</label>
+        <input type="date" id="date" name="date" required aria-required="true" />
+        <div id="dateError" class="error" aria-live="polite"></div>
+      </div>
+      <div class="input-group">
+        <label for="odoBefore">ODO reading before fuel fill</label>
+        <input type="number" id="odoBefore" name="odoBefore" min="0" step="any" required aria-required="true" />
+        <div id="odoBeforeError" class="error" aria-live="polite"></div>
+      </div>
+      <div class="input-group">
+        <label for="odoNext">Reading before NEXT fill</label>
+        <input type="number" id="odoNext" name="odoNext" min="0" step="any" required aria-required="true" />
+        <div id="odoNextError" class="error" aria-live="polite"></div>
+      </div>
+      <div class="input-group currency-input">
+        <label for="fuelCost">Fuel cost (₹)</label>
+        <span>₹</span>
+        <input type="number" id="fuelCost" name="fuelCost" min="0" step="any" required aria-required="true" />
+        <div id="fuelCostError" class="error" aria-live="polite"></div>
+      </div>
+      <div class="input-group currency-input">
+        <label for="pricePerLitre">Price per Litre (₹)</label>
+        <span>₹</span>
+        <input type="number" id="pricePerLitre" name="pricePerLitre" min="0" step="any" required aria-required="true" />
+        <div id="pricePerLitreError" class="error" aria-live="polite"></div>
+      </div>
+      <button type="submit" aria-label="Calculate fuel mileage and cost">Calculate</button>
+    </form>
+    <section id="results" class="results" aria-live="polite" aria-atomic="true"></section>
+  </main>
+  <script>
+    const form = document.getElementById('fuelForm');
+    const results = document.getElementById('results');
+
+    // New elements for saved data and filters
+    const savedDataSection = document.createElement('section');
+    savedDataSection.setAttribute('aria-live', 'polite');
+    savedDataSection.setAttribute('aria-atomic', 'true');
+    savedDataSection.style.marginTop = '2rem';
+
+    const filterContainer = document.createElement('div');
+    filterContainer.style.marginBottom = '1rem';
+    filterContainer.innerHTML = `
+      <label for="filterType" style="font-weight: 600; margin-right: 0.5rem;">Filter by:</label>
+      <select id="filterType" name="filterType" aria-label="Filter saved data by date, month, or year">
+        <option value="all">All</option>
+        <option value="date">Date</option>
+        <option value="month">Month</option>
+        <option value="year">Year</option>
+      </select>
+      <input type="date" id="filterDate" name="filterDate" style="margin-left: 0.5rem; padding: 0.25rem 0.5rem; border: 1px solid var(--color-gray-300); border-radius: 0.375rem; display: none;" aria-label="Select date for filtering" />
+    `;
+    savedDataSection.appendChild(filterContainer);
+
+    const savedDataTable = document.createElement('table');
+    savedDataTable.style.width = '100%';
+    savedDataTable.style.borderCollapse = 'collapse';
+    savedDataTable.style.textAlign = 'left';
+      savedDataTable.innerHTML = `
+      <thead>
+        <tr>
+          <th style="border-bottom: 2px solid var(--color-gray-300); padding: 0.5rem;">DATE</th>
+          <th style="border-bottom: 2px solid var(--color-gray-300); padding: 0.5rem;">FUEL FILLED (litres)</th>
+          <th style="border-bottom: 2px solid var(--color-gray-300); padding: 0.5rem;">DISTANCE COVERED (km)</th>
+          <th style="border-bottom: 2px solid var(--color-gray-300); padding: 0.5rem;">MILEAGE (km/litre)</th>
+          <th style="border-bottom: 2px solid var(--color-gray-300); padding: 0.5rem;">ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+    savedDataSection.appendChild(savedDataTable);
+
+    // Add Import and Export buttons container
+    const importExportContainer = document.createElement('div');
+    importExportContainer.style.marginTop = '1rem';
+    importExportContainer.style.display = 'flex';
+    importExportContainer.style.justifyContent = 'space-between';
+
+    // Export button
+    const exportBtn = document.createElement('button');
+    exportBtn.type = 'button';
+    exportBtn.textContent = 'Export CSV';
+    exportBtn.style.backgroundColor = 'var(--color-primary)';
+    exportBtn.style.color = 'white';
+    exportBtn.style.fontWeight = '700';
+    exportBtn.style.padding = '0.5rem 1rem';
+    exportBtn.style.border = 'none';
+    exportBtn.style.borderRadius = '0.375rem';
+    exportBtn.style.cursor = 'pointer';
+    exportBtn.style.transition = 'background-color 0.2s ease';
+    exportBtn.addEventListener('mouseenter', () => {
+      exportBtn.style.backgroundColor = 'var(--color-primary-dark)';
+    });
+    exportBtn.addEventListener('mouseleave', () => {
+      exportBtn.style.backgroundColor = 'var(--color-primary)';
+    });
+
+    // Import button
+    const importBtn = document.createElement('button');
+    importBtn.type = 'button';
+    importBtn.textContent = 'Import CSV';
+    importBtn.style.backgroundColor = 'var(--color-gray-700)';
+    importBtn.style.color = 'white';
+    importBtn.style.fontWeight = '700';
+    importBtn.style.padding = '0.5rem 1rem';
+    importBtn.style.border = 'none';
+    importBtn.style.borderRadius = '0.375rem';
+    importBtn.style.cursor = 'pointer';
+    importBtn.style.transition = 'background-color 0.2s ease';
+    importBtn.addEventListener('mouseenter', () => {
+      importBtn.style.backgroundColor = '#4b5563'; // darker gray
+    });
+    importBtn.addEventListener('mouseleave', () => {
+      importBtn.style.backgroundColor = 'var(--color-gray-700)';
+    });
+
+    importExportContainer.appendChild(importBtn);
+    importExportContainer.appendChild(exportBtn);
+    savedDataSection.appendChild(importExportContainer);
+
+    document.querySelector('main.container').appendChild(savedDataSection);
+
+    function clearErrors() {
+      ['date', 'odoBefore', 'odoNext', 'fuelCost', 'pricePerLitre'].forEach(id => {
+        document.getElementById(id + 'Error').textContent = '';
+      });
+    }
+
+    function validateInputs(data) {
+      let valid = true;
+      clearErrors();
+
+      if (!data.date) {
+        document.getElementById('dateError').textContent = 'Please select a date.';
+        valid = false;
+      }
+      if (data.odoBefore === '' || isNaN(data.odoBefore) || data.odoBefore < 0) {
+        document.getElementById('odoBeforeError').textContent = 'Please enter a valid ODO reading before fuel fill.';
+        valid = false;
+      }
+      if (data.odoNext === '' || isNaN(data.odoNext) || data.odoNext < 0) {
+        document.getElementById('odoNextError').textContent = 'Please enter a valid reading before next fill.';
+        valid = false;
+      }
+      if (data.odoNext <= data.odoBefore) {
+        document.getElementById('odoNextError').textContent = 'Reading before next fill must be greater than ODO before fuel fill.';
+        valid = false;
+      }
+      if (data.fuelCost === '' || isNaN(data.fuelCost) || data.fuelCost < 0) {
+        document.getElementById('fuelCostError').textContent = 'Please enter a valid fuel cost.';
+        valid = false;
+      }
+      if (data.pricePerLitre === '' || isNaN(data.pricePerLitre) || data.pricePerLitre <= 0) {
+        document.getElementById('pricePerLitreError').textContent = 'Please enter a valid price per litre.';
+        valid = false;
+      }
+      return valid;
+    }
+
+    // Save data to localStorage
+    function saveEntry(entry) {
+      let entries = JSON.parse(localStorage.getItem('fuelEntries') || '[]');
+      entries.push(entry);
+      localStorage.setItem('fuelEntries', JSON.stringify(entries));
+    }
+
+    // Export data as CSV
+    function exportCSV() {
+      const entries = loadEntries();
+      if (entries.length === 0) {
+        alert('No data to export.');
+        return;
+      }
+      const header = ['Date', 'Fuel Filled (litres)', 'Distance Covered (km)', 'Mileage (km/litre)'];
+      const csvRows = [
+        header.join(','),
+        ...entries.map(e => [e.date, e.fuelQuantity.toFixed(2), e.distance.toFixed(2), e.mileage.toFixed(2)].join(','))
+      ];
+      const csvString = csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'fuel_data.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Import data from CSV
+    function importCSV(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.trim().split('\n');
+        if (lines.length < 2) {
+          alert('CSV file is empty or invalid.');
+          return;
+        }
+        const newEntries = [];
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',');
+          if (cols.length !== 4) continue;
+          const [date, fuelStr, distStr, mileageStr] = cols;
+          const fuelQuantity = parseFloat(fuelStr);
+          const distance = parseFloat(distStr);
+          const mileage = parseFloat(mileageStr);
+          if (!date || isNaN(fuelQuantity) || isNaN(distance) || isNaN(mileage)) continue;
+          newEntries.push({ date, fuelQuantity, distance, mileage });
+        }
+        if (newEntries.length === 0) {
+          alert('No valid data found in CSV.');
+          return;
+        }
+        // Merge with existing entries, ignoring duplicates
+        let entries = loadEntries();
+        const existingKeys = new Set(entries.map(entry => `${entry.date}-${entry.fuelQuantity}-${entry.distance}-${entry.mileage}`));
+        const filteredNewEntries = newEntries.filter(entry => {
+          const key = `${entry.date}-${entry.fuelQuantity}-${entry.distance}-${entry.mileage}`;
+          return !existingKeys.has(key);
+        });
+        entries = entries.concat(filteredNewEntries);
+        localStorage.setItem('fuelEntries', JSON.stringify(entries));
+        renderEntries(filterTypeSelect.value, filterDateInput.value);
+        alert('Data imported successfully.');
+      };
+      reader.readAsText(file);
+    }
+
+    // Event listeners for import/export buttons
+    exportBtn.addEventListener('click', exportCSV);
+
+    importBtn.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv,text/csv';
+      input.onchange = () => {
+        if (input.files.length > 0) {
+          importCSV(input.files[0]);
+        }
+      };
+      input.click();
+    });
+
+    // Load data from localStorage
+    function loadEntries() {
+      return JSON.parse(localStorage.getItem('fuelEntries') || '[]');
+    }
+
+    // Delete entry
+    function deleteEntry(entryToDelete) {
+      let entries = loadEntries();
+      entries = entries.filter(entry => {
+        return !(
+          entry.date === entryToDelete.date &&
+          entry.fuelQuantity === entryToDelete.fuelQuantity &&
+          entry.distance === entryToDelete.distance &&
+          entry.mileage === entryToDelete.mileage
+        );
+      });
+      localStorage.setItem('fuelEntries', JSON.stringify(entries));
+      renderEntries(filterTypeSelect.value, filterDateInput.value);
+    }
+
+    // Render saved entries with optional filter
+    function renderEntries(filterType = 'all', filterValue = '') {
+      const entries = loadEntries();
+      const tbody = savedDataTable.querySelector('tbody');
+      tbody.innerHTML = '';
+
+      let filteredEntries = entries;
+
+      if (filterType !== 'all' && filterValue) {
+        filteredEntries = entries.filter(entry => {
+          const entryDate = new Date(entry.date);
+          const filterDate = new Date(filterValue);
+          if (filterType === 'date') {
+            return entry.date === filterValue;
+          } else if (filterType === 'month') {
+            return entryDate.getFullYear() === filterDate.getFullYear() &&
+                   entryDate.getMonth() === filterDate.getMonth();
+          } else if (filterType === 'year') {
+            return entryDate.getFullYear() === filterDate.getFullYear();
+          }
+          return true;
+        });
+      }
+
+      if (filteredEntries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 0.5rem;">No entries found.</td></tr>';
+        return;
+      }
+
++      // Sort entries by date descending (latest first)
++      filteredEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
++
+      filteredEntries.forEach(entry => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="padding: 0.5rem; border-bottom: 1px solid var(--color-gray-300);">${entry.date}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid var(--color-gray-300);">${entry.fuelQuantity.toFixed(2)}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid var(--color-gray-300);">${entry.distance.toFixed(2)}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid var(--color-gray-300);">${entry.mileage.toFixed(2)}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid var(--color-gray-300); text-align: center;">
+            <button aria-label="Delete entry on ${entry.date}" style="background-color: #dc2626; color: white; border: none; border-radius: 0.375rem; padding: 0.25rem 0.5rem; cursor: pointer; font-weight: 600; transition: background-color 0.2s ease;">Delete</button>
+          </td>
+        `;
+        const deleteBtn = tr.querySelector('button');
+        deleteBtn.addEventListener('click', () => {
+          if (confirm(`Are you sure you want to delete the entry on ${entry.date}?`)) {
+            deleteEntry(entry);
+          }
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Show or hide filter date input based on filter type
+    const filterTypeSelect = document.getElementById('filterType');
+    const filterDateInput = document.getElementById('filterDate');
+    filterTypeSelect.addEventListener('change', () => {
+      if (filterTypeSelect.value === 'all') {
+        filterDateInput.style.display = 'none';
+        renderEntries('all', '');
+      } else {
+        filterDateInput.style.display = 'inline-block';
+        filterDateInput.value = '';
+        renderEntries(filterTypeSelect.value, '');
+      }
+    });
+
+    filterDateInput.addEventListener('change', () => {
+      renderEntries(filterTypeSelect.value, filterDateInput.value);
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const data = {
+        date: form.date.value,
+        odoBefore: parseFloat(form.odoBefore.value),
+        odoNext: parseFloat(form.odoNext.value),
+        fuelCost: parseFloat(form.fuelCost.value),
+        pricePerLitre: parseFloat(form.pricePerLitre.value),
+      };
+
+      if (!validateInputs(data)) {
+        results.textContent = '';
+        return;
+      }
+
+      const distance = data.odoNext - data.odoBefore;
+      const fuelQuantity = data.fuelCost / data.pricePerLitre;
+      const mileage = distance / fuelQuantity;
+
+      results.innerHTML = `
+      <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+          <tr>
+            <th style="border-bottom: 2px solid var(--color-gray-300); padding: 0.5rem;">FUEL FILLED (litres)</th>
+            <th style="border-bottom: 2px solid var(--color-gray-300); padding: 0.5rem;">DISTANCE COVERED (km)</th>
+            <th style="border-bottom: 2px solid var(--color-gray-300); padding: 0.5rem;">MILEAGE (km/litre)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 0.5rem; border-bottom: 1px solid var(--color-gray-300);">${fuelQuantity.toFixed(2)}</td>
+            <td style="padding: 0.5rem; border-bottom: 1px solid var(--color-gray-300);">${distance.toFixed(2)}</td>
+            <td style="padding: 0.5rem; border-bottom: 1px solid var(--color-gray-300);">${mileage.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+      `;
+
+      // Save the entry
+      saveEntry({
+        date: data.date,
+        odoBefore: data.odoBefore,
+        odoNext: data.odoNext,
+        fuelQuantity,
+        distance,
+        mileage
+      });
+
+      // Re-render saved entries with current filter
+      renderEntries(filterTypeSelect.value, filterDateInput.value);
+    });
+
+    // Initial render of saved entries
+    renderEntries();
+  </script>
+</body>
+</html>
